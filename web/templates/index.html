@@ -19,7 +19,6 @@
 		</ul>		
 		<ul class="navbar-nav navbar-right">
 		  <li class="nav-item">
-			  {{ .Auth}}
 			{{if .Auth}}
 				<a class="nav-link" href="/logout">Logout</a>
 			{{else}}
@@ -34,7 +33,6 @@
     <div class="container" id="container">
         <div class="row">
             {{.Body}}
-			{{ .Auth}}
 			<ul>				
 				<li class="color-green"><a href="/keys">Keys</a></li>
 			</ul>

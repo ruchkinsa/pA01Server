@@ -42,7 +42,7 @@ type key struct {
 	IsBlosed       string
 }
 
-type page struct {
+type Page struct {
 	Title string
 	Body  template.HTML //[]byte
 	Auth  bool
@@ -89,19 +89,20 @@ func Start(cfg Config, listener net.Listener) {
 		r.Handle("/keys", keysHandler())
 		r.Get("/key/add", keyAddHandler)
 	})
-
+	r.Get("/logout", logoutHandler)
 	// routers: public
 	r.Group(func(r chi.Router) {
 		r.Route("/login", func(r chi.Router) {
 			r.Post("/", authHandler()) // POST
 			r.Get("/", loginHandler)   // GET
 		})
-		r.Handle("/", indexHandler())
-		r.Get("/logout", logoutHandler)
+
 		// ways static data
 		r.Handle("/css/*", http.StripPrefix("/css/", http.FileServer(cfg.PublicPathCSS)))
 		r.Handle("/js/*", http.StripPrefix("/js/", http.FileServer(cfg.PublicPathJS)))
 		r.Handle("/templates/*", http.StripPrefix("/templates/", http.FileServer(cfg.PublicPathTemplates)))
+
+		/*r.Handle("/", indexHandler())*/
 		r.NotFound(error404Handler) // назначаем обработчик, если запрошенный url не существует
 	})
 	// templates: base
@@ -133,7 +134,7 @@ func keysHandler() http.Handler {
 			return
 		}		*/
 		//fmt.Fprintf(w, string(js))
-		p := page{Title: "keys", Keys: keys}
+		p := Page{Title: "keys", Keys: keys}
 		renderTemplate(w, r, "keys", &p)
 	})
 }
@@ -159,7 +160,7 @@ func keyAddHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}		*/
 	//fmt.Fprintf(w, string(js))
-	p := page{Title: "keys", Keys: keys}
+	p := Page{Title: "keys", Keys: keys}
 	renderTemplate(w, r, "keys", &p)
 }
 
@@ -247,7 +248,8 @@ func indexHandler() http.Handler {
 			auth = "true"
 		}
 		log.Println("indexHandler: .Auth =", auth)
-		p := page{Title: "Home", Body: template.HTML("<p>Home page</p>"), Auth: u.getAuth()}
+		p := Page{Title: "Home", Body: template.HTML("<p>Home Page</p>"), Auth: u.getAuth()}
+		log.Printf("%+v", p)
 		//renderTemplate(w, r, "index", &p)
 		renderTemplate(w, r, "index", &p)
 	})
@@ -257,7 +259,7 @@ func indexHandler() http.Handler {
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("loginHandler")
-	p := page{Title: "Login", Body: template.HTML("<p>Login page</p>")}
+	p := Page{Title: "Login", Body: template.HTML("<p>Login Page</p>")}
 	renderTemplate(w, r, "login", &p)
 }
 
@@ -289,15 +291,19 @@ func authHandler() http.HandlerFunc {
 			}
 			//log.Println("JWT token: ", token)
 			// cookie
-			jwtCookie := &http.Cookie{}
+			/*jwtCookie := &http.Cookie{}
 			jwtCookie.Name = "jwt"
 			jwtCookie.Value = token
+			jwtCookie.Path = "/"
 			jwtCookie.Expires = time.Now().Add(time.Hour * 12)
-			http.SetCookie(w, jwtCookie)
+			http.SetCookie(w, jwtCookie)*/
+			jwtCookie := http.Cookie{Name: "jwt", Value: token, HttpOnly: true, Path: "/", MaxAge: 0, Secure: true}
+			http.SetCookie(w, &jwtCookie)
 			// redirect to URL
 			http.Redirect(w, r, "/keys", 301)
+			return
 		}
-		p := page{Title: "Login", Body: template.HTML("<b>User not found!<b>")}
+		p := Page{Title: "Login", Body: template.HTML("<b>User not found!<b>")}
 		renderTemplate(w, r, "login", &p)
 	})
 }
@@ -315,6 +321,9 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 		auth = "true"
 	}
 	log.Println("logoutHandler: .Auth4 =", auth)
+
+	jwtCookie := http.Cookie{Name: "jwt", Value: "", HttpOnly: false, Path: "/", MaxAge: -1, Expires: time.Unix(0, 0)}
+	http.SetCookie(w, &jwtCookie)
 	// redirect to URL
 	http.Redirect(w, r, "/", 301)
 }

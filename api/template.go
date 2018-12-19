@@ -28,7 +28,7 @@ func loadTemplates(nameTamplate string) (status int, err error) {
 	return 200, err
 }
 
-func renderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, p *page) {
+func renderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, p *Page) {
 	//log.Println("log: renderTemplate -> "+tmpl)
 	if !checkTitleValidator(tmpl) {
 		errorHandler(w, r, http.StatusBadRequest)
