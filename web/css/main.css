@@ -1,0 +1,51 @@
+
+body { 
+	background-color: #fafafa; 
+	min-height: 100%;
+	height: auto !important;
+	height: 100%;
+	position: relative;		
+}
+input {
+	padding: 6px 12px;
+	border: 1px solid #CCC;
+	border-radius: 4px;
+	box-shadow: 0px 1px 1px rgba(0, 0, 0, 0.075) inset;
+	transition: border-color 0.15s ease-in-out 0s, box-shadow 0.15s ease-in-out 0s;
+}
+
+.text-center {
+	text-align: center;
+}
+
+.color-orange {	color: #fe6f03; }
+.color-light-orange { color: #FFA07A; }
+.color-blue { color: #0B7FA4; }
+.color-light-blue { color: #68A4D6; }
+.color-black-blue { color: #003366; }
+.color-green { color: #558d0a; }
+.color-grey { color: #666; }
+.color-light-grey { color: #aaa; }
+.color-light2-grey { color: #ddd; }
+.color-light3-grey { color: #eee; }
+.color-light4-grey { color: #f5f5f5; }
+.color-red { color: red; }
+.color-black-red { color: #8B0000;}
+.color-black { color: black; }
+.color-white { color: white; }
+.color-white:hover { color: #fe6f03; }
+.bg-orange { background-color: #fe6f03; }
+.bg-green { background-color: #558d0a; }
+.bg-light-green { background-color: #5cb85c; }
+.bg-grey { background-color: #666; }
+.bg-light-grey { background-color: #aaa; }
+.bg-light2-grey { background-color: #ddd; }
+.bg-light3-grey { background-color: #eee; }
+.bg-light4-grey { background-color: #f7f7f7; }
+.bg-red { background-color: red; }
+.bg-black-red { background-color: #8B0000;}
+.bg-black { background-color: black; }
+.bg-white { background-color: white; }
+.bg-blue { background-color: #0B7FA4; }
+.bg-black-blue { background-color: #003366; }
+.bg-light-blue { background-color: #5bc0de; }
