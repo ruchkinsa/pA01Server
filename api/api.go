@@ -2,10 +2,9 @@ package api
 
 import (
 	"bufio"
-	//"encoding/json"
 	//"fmt"
 	"html/template"
-	//"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -77,6 +76,18 @@ func init() {
 
 func Start(cfg Config, listener net.Listener) {
 
+	info, err := os.Stat(path.Join(cfg.PublicPath, cfg.NameFile))
+	if err != nil {
+		if os.IsNotExist(err) {
+			log.Println("Файл данных не существует")
+			return
+		}
+	}
+	if info.IsDir() {
+		log.Println("Указан не файл, а папка")
+		return
+	}
+
 	u.Create()
 	u.setFileKeys(path.Join(cfg.PublicPath, cfg.NameFile))
 	r := chi.NewRouter()
@@ -86,23 +97,26 @@ func Start(cfg Config, listener net.Listener) {
 		r.Use(jwtauth.Verifier(tokenAuth)) // Seek, verify and validate JWT tokens
 		r.Use(jwtauth.Authenticator)       // можно переопределить этот метод проверки
 
-		r.Handle("/keys", keysHandler())
-		r.Get("/key/add", keyAddHandler)
+		r.Route("/keys", func(rKeys chi.Router) {
+			rKeys.Handle("/", keysHandler())
+			rKeys.Get("/key/add", keyAddHandler)
+			rKeys.Get("/key/{id}/delete", keyDeleteHandler)
+		})
 	})
-	r.Get("/logout", logoutHandler)
+
 	// routers: public
 	r.Group(func(r chi.Router) {
 		r.Route("/login", func(r chi.Router) {
 			r.Post("/", authHandler()) // POST
 			r.Get("/", loginHandler)   // GET
 		})
-
+		r.Get("/logout", logoutHandler)
 		// ways static data
 		r.Handle("/css/*", http.StripPrefix("/css/", http.FileServer(cfg.PublicPathCSS)))
 		r.Handle("/js/*", http.StripPrefix("/js/", http.FileServer(cfg.PublicPathJS)))
 		r.Handle("/templates/*", http.StripPrefix("/templates/", http.FileServer(cfg.PublicPathTemplates)))
 
-		/*r.Handle("/", indexHandler())*/
+		r.Handle("/", indexHandler())
 		r.NotFound(error404Handler) // назначаем обработчик, если запрошенный url не существует
 	})
 	// templates: base
@@ -128,13 +142,7 @@ func keysHandler() http.Handler {
 			errorHandler(w, r, http.StatusBadRequest)
 			return
 		}
-		/*js, err := json.Marshal(keys)
-		if err != nil {
-			errorHandler(w, r, http.StatusBadRequest)
-			return
-		}		*/
-		//fmt.Fprintf(w, string(js))
-		p := Page{Title: "keys", Keys: keys}
+		p := Page{Title: "keys", Keys: keys, Auth: u.getAuth()}
 		renderTemplate(w, r, "keys", &p)
 	})
 }
@@ -147,21 +155,28 @@ func keyAddHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// redirect to URL
-	//http.Redirect(w, r, "/keys", 301)
+	http.Redirect(w, r, "/keys", 303)
+	return
+}
 
-	keys, err := loadKeys(u.getFileKeys())
+func keyDeleteHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("keyDeleteHandler")
+	idKey, err := strconv.Atoi(chi.URLParam(r, "id"))
 	if err != nil {
+		log.Println("Error delete key: %v", err)
 		errorHandler(w, r, http.StatusBadRequest)
 		return
 	}
-	/*js, err := json.Marshal(keys)
+	var k key
+	err = k.delete(idKey)
 	if err != nil {
+		log.Println("Error delete key: %v", err)
 		errorHandler(w, r, http.StatusBadRequest)
 		return
-	}		*/
-	//fmt.Fprintf(w, string(js))
-	p := Page{Title: "keys", Keys: keys}
-	renderTemplate(w, r, "keys", &p)
+	}
+	// redirect to URL
+	http.Redirect(w, r, "/keys", 303)
+	return
 }
 
 func loadKeys(fileKeys string) ([]key, error) {
@@ -182,12 +197,14 @@ func loadKeys(fileKeys string) ([]key, error) {
 	for scanner.Scan() {
 		line = scanner.Text()
 		cols = strings.Split(line, "|")
-		k.Id = cols[0] //strconv.Atoi(cols[0])
-		k.Text = cols[1]
-		k.ExpirationDate = cols[2]
-		k.LastUsed = cols[3]
-		k.IsBlosed = cols[4]
-		keys = append(keys, k)
+		if len(cols) > 0 {
+			k.Id = cols[0] //strconv.Atoi(cols[0])
+			k.Text = cols[1]
+			k.ExpirationDate = cols[2]
+			k.LastUsed = cols[3]
+			k.IsBlosed = cols[4]
+			keys = append(keys, k)
+		}
 		if err = scanner.Err(); err != nil {
 			break
 		}
@@ -214,7 +231,6 @@ func keyAdd() error {
 		log.Println("Error opening file: %v", err)
 		return err
 	}
-	defer file.Close()
 	scanner := bufio.NewScanner(file)
 	col := 1
 	for scanner.Scan() {
@@ -223,7 +239,13 @@ func keyAdd() error {
 			break
 		}
 	}
-
+	file.Close()
+	file, err = os.OpenFile(u.getFileKeys(), os.O_APPEND|os.O_WRONLY, 0666)
+	defer file.Close()
+	if err != nil {
+		log.Println("Error opening file: %v", err)
+		return err
+	}
 	var rec string
 	rec = strconv.Itoa(col)
 	rec += "|" + "key" + strconv.Itoa(col)
@@ -232,10 +254,57 @@ func keyAdd() error {
 	rec += "|" + t.Format("2006-01-02 15:04:05")
 	rec += "|false"
 
-	log.Println(rec)
+	log.Println("keyAdd: ", rec)
 
-	file.WriteString(rec)
+	if _, err := file.WriteString("\n" + rec); err != nil {
+		log.Println("Error writing file:", err)
+		return err
+	}
 	return nil
+}
+
+func (k *key) delete(id int) error {
+	file, err := os.Open(u.getFileKeys())
+	if err != nil {
+		log.Println("Error opening file: %v", err)
+		return err
+	}
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	var line string
+	var cols []string
+	number := 0
+	numLine := 0
+	for scanner.Scan() {
+		line = scanner.Text()
+		numLine++
+		cols = strings.Split(line, "|")
+		number, err = strconv.Atoi(cols[0])
+		if number == id {
+			break
+		}
+		if err = scanner.Err(); err != nil {
+			break
+		}
+	}
+	if err != nil {
+		log.Println("Error reading file: %v", err)
+		return err
+	}
+
+	fileread, err := ioutil.ReadFile(u.getFileKeys())
+	if err != nil {
+		log.Println("Error opening file: %v", err)
+		return err
+	}
+	lines := strings.Split(string(fileread), "\n")
+	lineAfter := strings.Join(lines[0:(numLine-1)], "\n")
+	lineBefore := strings.Join(lines[numLine:len(lines)], "\n")
+	if len(lineBefore) > 0 {
+		lineBefore = "\n" + lineBefore
+	}
+	return ioutil.WriteFile(u.getFileKeys(), []byte(lineAfter+lineBefore), 0666)
+
 }
 
 //********** Routes: default **********************************************************************************************************************************************
@@ -243,11 +312,6 @@ func keyAdd() error {
 func indexHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Println("indexHandler")
-		auth := "false"
-		if u.getAuth() {
-			auth = "true"
-		}
-		log.Println("indexHandler: .Auth =", auth)
 		p := Page{Title: "Home", Body: template.HTML("<p>Home Page</p>"), Auth: u.getAuth()}
 		log.Printf("%+v", p)
 		//renderTemplate(w, r, "index", &p)
@@ -268,20 +332,8 @@ func authHandler() http.HandlerFunc {
 		log.Println("authHandler")
 		login := r.PostFormValue("username")
 		password := r.PostFormValue("password")
-		log.Println("authHandler->login: " + login)
-		log.Println("authHandler->password: " + password)
 		if login == "admin" && password == "password" {
-			auth := "false"
-			if u.getAuth() {
-				auth = "true"
-			}
-			log.Println("authHandler: .Auth1 =", auth)
 			u.setAuth(true)
-			auth = "false"
-			if u.getAuth() {
-				auth = "true"
-			}
-			log.Println("authHandler: .Auth2 =", auth)
 			// создание и запись данных о пользователе в сессию/БД/cookie
 			token, err := createTokenJWT(login)
 			if err != nil {
@@ -291,16 +343,16 @@ func authHandler() http.HandlerFunc {
 			}
 			//log.Println("JWT token: ", token)
 			// cookie
-			/*jwtCookie := &http.Cookie{}
+			jwtCookie := &http.Cookie{}
 			jwtCookie.Name = "jwt"
 			jwtCookie.Value = token
 			jwtCookie.Path = "/"
 			jwtCookie.Expires = time.Now().Add(time.Hour * 12)
-			http.SetCookie(w, jwtCookie)*/
-			jwtCookie := http.Cookie{Name: "jwt", Value: token, HttpOnly: true, Path: "/", MaxAge: 0, Secure: true}
-			http.SetCookie(w, &jwtCookie)
+			http.SetCookie(w, jwtCookie)
+			//jwtCookie := http.Cookie{Name: "jwt", Value: token, HttpOnly: true, Path: "/", MaxAge: 0}
+			//http.SetCookie(w, &jwtCookie)
 			// redirect to URL
-			http.Redirect(w, r, "/keys", 301)
+			http.Redirect(w, r, "/keys", 303)
 			return
 		}
 		p := Page{Title: "Login", Body: template.HTML("<b>User not found!<b>")}
@@ -310,22 +362,12 @@ func authHandler() http.HandlerFunc {
 
 func logoutHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("logoutHandler")
-	auth := "false"
-	if u.getAuth() {
-		auth = "true"
-	}
-	log.Println("logoutHandler: .Auth3 =", auth)
 	u.setAuth(false)
-	auth = "false"
-	if u.getAuth() {
-		auth = "true"
-	}
-	log.Println("logoutHandler: .Auth4 =", auth)
-
 	jwtCookie := http.Cookie{Name: "jwt", Value: "", HttpOnly: false, Path: "/", MaxAge: -1, Expires: time.Unix(0, 0)}
 	http.SetCookie(w, &jwtCookie)
 	// redirect to URL
-	http.Redirect(w, r, "/", 301)
+	http.Redirect(w, r, "/", 303)
+	return
 }
 
 func createTokenJWT(login string) (string, error) {
@@ -363,6 +405,7 @@ func error404Handler(w http.ResponseWriter, r *http.Request) {
 		log.Println("log: error404Handler->error: " + err.Error())
 		http.Error(w, http.StatusText(500), 500)
 	}
+	return
 }
 
 func errorHandler(w http.ResponseWriter, r *http.Request, status int) {
@@ -373,6 +416,7 @@ func errorHandler(w http.ResponseWriter, r *http.Request, status int) {
 		log.Println("log: errorHandler->error: " + err.Error())
 		http.Error(w, http.StatusText(500), 500)
 	}
+	return
 }
 
 //********** User **********************************************************************************************************************************************

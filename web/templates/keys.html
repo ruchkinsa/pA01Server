@@ -8,12 +8,11 @@
 	  </button>
 	  <div class="collapse navbar-collapse" id="navbarSupportedContent">
 		<ul class="navbar-nav mr-auto">
-		  <li class="nav-item active">
-			<a class="nav-link" href="/">Home <span class="sr-only">(current)</span></a>
-		  </li>
-		  <li class="nav-item">
-			<a class="nav-link" href="#">Link</a>
-		  </li>		  
+		  <li class="nav-item active"><a class="nav-link" href="/">Home <span class="sr-only">(current)</span></a></li>
+		  {{if .Auth}}
+        <li class="nav-item"><a class="nav-link" href="/keys">Keys</a></li>		
+      {{end}}
+      <li class="nav-item"><a class="nav-link" href="#">Link</a></li>
 		</ul>		
 		<ul class="navbar-nav navbar-right">
 		  <li class="nav-item">			
@@ -25,32 +24,31 @@
 {{end}}
 {{define "body"}}
     <div class="container" id="container">
-        <div class="row">
-			<h3>Keys</h3>
-			<table BORDER="1">
-				<tr>
-					<td>#</td>
-					<td>key</td>
-					<td>ExpirationDate</td>
-					<td>LastUsed</td>
-					<td>IsBlosed</td>
-					<td>Action</td>
-				</tr>
-            {{range .Keys}}
-				<tr>
-					<td>{{ .Id }}</td>
-					<td>{{ .Text }}</td>
-					<td>{{ .ExpirationDate }}</td>
-					<td>{{ .LastUsed }}</td>
-					<td>{{ .IsBlosed }}</td>
-					<td><a href="/key/delete">Delete key</a></td>
-				</tr>							
-			{{end}}
-				<tr>
-					<td COLSPAN=5><a href="/key/add">Add key</a></td>
-				</tr>
-			</table>
-        </div>
+      <div class="row">			
+        <table class="table table-striped table-hover table-condensed">
+          <tr>
+            <th>#</th>
+            <th>key</th>
+            <th>ExpirationDate</th>
+            <th>LastUsed</th>
+            <th>IsBlosed</th>
+            <th>Action</th>
+          </tr>
+              {{range .Keys}}
+          <tr>
+            <td>{{ .Id }}</td>
+            <td>{{ .Text }}</td>
+            <td>{{ .ExpirationDate }}</td>
+            <td>{{ .LastUsed }}</td>
+            <td>{{ .IsBlosed }}</td>
+            <td><a href="/keys/key/{{ .Id }}/delete">Delete key</a></td>
+          </tr>							
+        {{end}}
+          <tr>
+            <td COLSPAN=6><a href="/keys/key/add">Add key</a></td>
+          </tr>
+        </table>
+      </div>
     </div>
 {{end}}
 {{define "scripts"}}<script src="/js/main.js"></script>{{end}}

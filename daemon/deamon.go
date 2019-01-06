@@ -10,7 +10,7 @@ import (
 	"path"
 	"syscall"
 
-	"../api"
+	"github.com/ruchkinsa/pA01Server/api"
 )
 
 type Config struct {

@@ -8,7 +8,7 @@ import (
 	"path"
 	//"path/filepath"
 
-	"./daemon"
+	"github.com/ruchkinsa/pA01Server/daemon"
 )
 
 var publicPath string
