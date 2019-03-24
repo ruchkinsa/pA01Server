@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+
 	//"path/filepath"
 
 	"github.com/ruchkinsa/pA01Server/daemon"
@@ -28,6 +29,7 @@ func flagsRun() *daemon.Config {
 
 	flag.StringVar(&cfg.ListenHost, "listen", "localhost:10000", "HTTP listen")
 	flag.StringVar(&publicPath, "public-path", "web", "Path to public dir")
+	flag.StringVar(&cfg.API.DbConnect.ConnectString, "db-connect", "root:admin@tcp(localhost:3306)/licenses", "DB Connect String")
 	flag.StringVar(&cfg.API.NameFile, "name-file", "keys.txt", "Test data")
 
 	flag.Parse()

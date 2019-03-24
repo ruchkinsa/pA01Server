@@ -4,7 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <title>{{template "title" .}}</title>
-	<link href="/css/bootstrap.min.css" rel="stylesheet" media="screen">	
+    <link href="/css/bootstrap.min.css" rel="stylesheet" type="text/css" media="screen">
+    <link href="/css/inons/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+    <link href="/css/main.css" rel="stylesheet" type="text/css" media="screen">	
     {{template "head" .}}
 </head>
 <body>
@@ -12,7 +14,8 @@
   {{template "body" .}}
 
 	<script src="/js/jquery-1.11.1.min.js"></script>
-	<script src="/js/bootstrap.min.js"></script>	
+  <script src="/js/bootstrap.min.js"></script>	
+  <script src="/js/main.js"></script>
   {{template "scripts"}}
 </body>
 </html>

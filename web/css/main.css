@@ -14,9 +14,10 @@ input {
 	transition: border-color 0.15s ease-in-out 0s, box-shadow 0.15s ease-in-out 0s;
 }
 
-.text-center {
-	text-align: center;
-}
+.cursor-pointer{ cursor: pointer; }
+
+.hide {display: none;}
+
 
 .color-orange {	color: #fe6f03; }
 .color-light-orange { color: #FFA07A; }

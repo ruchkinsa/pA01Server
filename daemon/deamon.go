@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/ruchkinsa/pA01Server/api"
+	"github.com/ruchkinsa/pA01Server/database"
 )
 
 type Config struct {
@@ -20,6 +21,13 @@ type Config struct {
 
 func Run(cfg *Config) error {
 	log.Printf("Starting, HTTP on: %s\n", cfg.ListenHost)
+
+	dbConnect, err := database.InitDb(cfg.API.DbConnect)
+	if err != nil {
+		log.Printf("Error initializing database: %v\n", err)
+		return err
+	}
+	cfg.API.DbConnect.DbConn = dbConnect
 
 	existsFile, err := exists(path.Join(cfg.API.PublicPath, cfg.API.NameFile))
 	if !existsFile {

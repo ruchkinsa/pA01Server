@@ -1,0 +1,86 @@
+{{define "title"}}{{.Title}}{{end}}
+{{define "head"}}{{end}}
+{{define "header"}}	
+	<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+	  <a class="navbar-brand" href="/">Nafanja Co</a>
+	  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+		<span class="navbar-toggler-icon"></span>
+	  </button>
+	  <div class="collapse navbar-collapse" id="navbarSupportedContent">
+		<ul class="navbar-nav mr-auto">
+      <a class="nav-link" href="/"><span class="fa fa-home"></span> Home</a>
+		  {{if .Auth}}
+        <li class="nav-item"><a class="nav-link" href="/keys">Keys</a></li>
+				<li class="nav-item"><a class="nav-link" href="/products">Products</a></li>
+				<li class="nav-item"><a class="nav-link" href="/testing">Test</a></li>
+      {{end}}
+      <li class="nav-item"><a class="nav-link" href="#">Link</a></li>
+		</ul>		
+		<ul class="navbar-nav navbar-right">
+		  <li class="nav-item">			
+			<a class="nav-link" href="/logout">Logout</a>			
+		  </li>
+		</ul>		
+	  </div>
+	</nav>
+{{end}}
+{{define "body"}}
+	<div class="container-fluid">		
+		<h1 class="display-4 text-center">Test</h1>
+		<div class="row">	
+			<div class="jumbotron col-xs-6 col-md-6 col-sm-6">	
+				<h3 class="text-center">Key info</h3>	
+				<hr class="my-4">			
+				<button type="button" class="btn btn-sm btn-primary" onclick="checkKey()">Check Key</button>
+				<button type="button" class="btn btn-sm btn-success" onclick="activateKey()">Activate Key</button>
+				<hr class="my-4">			
+				 <div class="input-group-sm">
+						<label class="color-grey">keyText</label>          												
+						<input id="keyText" name="keyText" class="form-control" type="text" value="" >
+					</div>
+					<div class="input-group-sm">
+						<label class="color-grey">keyPublicN</label>          
+						<input id="keyPublicN" name="keyPublicN" class="form-control" type="text" value="" >
+					</div>
+					<div class="input-group-sm">
+						<label class="color-grey">keyPublicE</label>          
+						<input id="keyPublicE" name="keyPublicE" class="form-control" type="text" value="" >
+					</div>
+					<div class="input-group-sm">
+						<label class="color-grey">keyPrivateD</label>          
+						<input id="keyPrivateD" name="keyPrivateD" class="form-control" type="text" value="" >              
+					</div>
+					<div class="input-group-sm">
+						<label class="color-grey">keyPrivatePrimes</label>          
+						<input id="keyPrivatePrimes" name="keyPrivatePrimes" class="form-control" type="text" value="" >              
+					</div>
+					<div class="input-group-sm">
+						<label class="color-grey">keyPrivatePrecomputedDp</label>          
+						<input id="keyPrivatePrecomputedDp" name="keyPrivatePrecomputedDp" class="form-control" type="text" value="" >              
+					</div>
+					<div class="input-group-sm">
+						<label class="color-grey">keyPrivatePrecomputedDq</label>          
+						<input id="keyPrivatePrecomputedDq" name="keyPrivatePrecomputedDq" class="form-control" type="text" value="" >              
+					</div>
+					<div class="input-group-sm">
+						<label class="color-grey">keyPrivatePrecomputedQinv</label>          
+						<input id="keyPrivatePrecomputedQinv" name="keyPrivatePrecomputedQinv" class="form-control" type="text" value="" >              
+					</div>
+					<div class="input-group-sm">
+						<label class="color-grey">keyPrivatePrecomputedCRTValueExp</label>          
+						<input id="keyPrivatePrecomputedCRTValueExp" name="keyPrivatePrecomputedCRTValueExp" class="form-control" type="text" value="" >              
+					</div>
+					<div class="input-group-sm">
+						<label class="color-grey">keyPrivatePrecomputedCRTValueCoeff</label>          
+						<input id="keyPrivatePrecomputedCRTValueCoeff" name="keyPrivatePrecomputedCRTValueCoeff" class="form-control" type="text" value="" >              
+					</div>				
+			</div>	
+
+			<div class="jumbotron col-xs-6 col-md-6 col-sm-6">	
+				<h3 class="text-center">Logs</h3>
+				<div id="log"></div>
+			</div>			
+		</div>			
+	</div>
+{{end}}
+{{define "scripts"}}<script src="/js/test.js"></script>{{end}}

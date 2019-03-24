@@ -1,0 +1,92 @@
+{{define "title"}}{{.Title}}{{end}}
+{{define "head"}}{{end}}
+{{define "header"}}	
+	<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+	  <a class="navbar-brand" href="/">Nafanja Co</a>
+	  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+		<span class="navbar-toggler-icon"></span>
+	  </button>
+	  <div class="collapse navbar-collapse" id="navbarSupportedContent">
+		<ul class="navbar-nav mr-auto">
+          <a class="nav-link" href="/"><span class="fa fa-home"></span> Home</a>
+		      {{if .Auth}}
+            <li class="nav-item"><a class="nav-link" href="/keys">Keys</a></li>
+            <li class="nav-item"><a class="nav-link" href="/products">Products</a></li>
+            <li class="nav-item"><a class="nav-link" href="/testing">Test</a></li>
+          {{end}}
+      <li class="nav-item"><a class="nav-link" href="#">Link</a></li>
+		</ul>		
+		<ul class="navbar-nav navbar-right">
+		  <li class="nav-item">			
+			<a class="nav-link" href="/logout">Logout</a>			
+		  </li>
+		</ul>		
+	  </div>
+	</nav>
+{{end}}
+{{define "body"}}
+<!-- Modal  -->
+<div class="modal fade" id="modalRecord" tabindex="-1" role="dialog" aria-labelledby="recordProduct" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title"></h4>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>        
+      </div>    
+      <div class="modal-body">
+          <div class="row">
+            <div class="form-horizontal">          
+              <input id="productId" name="productId" type="hidden" value="">                                        
+              <div class="form-group form-inline">
+                <label class="col-xs-4 col-md-4 col-sm-4 control-label color-grey">Name</label>          
+                <input id="mName" name="mName" class="col-xs-8 col-md-8 col-sm-8 form-control" type="text" value="" required="required">              
+              </div>            
+              <div class="form-group form-inline">
+                <label class="col-xs-4 col-md-4 col-sm-4 control-label color-grey">Version</label>          
+                <input id="mVersion" name="mVersion" class="col-xs-8 col-md-8 col-sm-8 form-control" type="text" value="" required="required">              
+              </div>              
+            </div>
+          </div>
+      </div>    
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default btn-sm" data-dismiss="modal">Cansel</button>        
+        <button type="button" class="btn btn-success btn-sm" id="saveEditRecord">Save</button>                    
+      </div>                  
+    </div>
+  </div>
+</div>
+<!-- end Modal  -->
+    <div id="message"></div>
+    <div class="container" id="container">
+      <div class="row">			
+        <table  id="products" class="table table-striped table-hover table-condensed">
+          <tr>
+            <th>#</th>        
+            <th>Product</th>   
+            <th>Version</th>
+            <th>KeyPublicN</th>
+            <th>KeyPublicE</th>                                    
+            <th>Action</th>
+          </tr>
+          <tbody id="contentProducts"></tbody>
+              {{range .Products}}             
+          <tr id="record{{ .ID }}">
+            <td class="ID">{{ .ID }}</td>
+            <td class="Name">{{ .Name }}</td>
+            <td class="Version">{{ .Version }}</td>            
+            <td class="KeyPublicN">{{ .KeyPublicN }}</td>
+            <td class="KeyPublicE">{{ .KeyPublicE }}</td>
+            <td><a class="cursor-pointer text-primary" onclick="EditProduct({{.ID}})"><span class="fa fa-edit"></span></a></td>
+          </tr>							
+        {{end}}
+        </tbody>
+        <tbody>
+          <tr>
+            <td COLSPAN=9><a class="cursor-pointer text-primary" onclick="AddProduct()"><span class="fa fa-plus-square"></span> Add product</a></td>
+          </tr>
+        </tbody>
+        </table>
+      </div>
+    </div>
+{{end}}
+{{define "scripts"}}<script src="/js/products.js"></script>{{end}}
