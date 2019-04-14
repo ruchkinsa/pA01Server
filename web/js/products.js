@@ -35,8 +35,8 @@ function productSave(){
       });
         
       request.done(function(msg) { // успешно	
-         //alert(msg.status);
-        if (msg.status) {
+        //alert('error.status='+msg.error.status);        
+        if (msg.error.status) {
             if (id == 0) {       
               $("#contentProducts").append('<tr id="record'+msg.data.ID+'">'
                                     + '<td class="ID">'+msg.data.ID+'</td>'
@@ -56,7 +56,7 @@ function productSave(){
             $('#modalRecord').modal('hide');
             return true
          } else { 										
-            $("#message").empty().append('<div class="alert alert-danger otstup-vert10 text-center"><button type="button" class="close interval-right10" data-dismiss="alert" aria-hidden="true">&times;</button><strong>При сохранении произошла ошибка: '+msg.error+'</strong></div>');					
+            $("#message").empty().append('<div class="alert alert-danger otstup-vert10 text-center"><button type="button" class="close interval-right10" data-dismiss="alert" aria-hidden="true">&times;</button><strong>При сохранении произошла ошибка: '+msg.error.message+'</strong></div>');					
             return false;
         }				
       });

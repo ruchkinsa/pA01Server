@@ -8,12 +8,13 @@ function checkKey() {
         cache: false,
         timeout: 3000
       });          
-      request.done(function(msg) { // успешно	      
-        if (msg.status) {    
+      request.done(function(msg) { // успешно	         
+        //alert('msg.status = '+msg.status);             
+        if (msg.status) {
             $('#log').append('<p>Результат: лицензия подтверждена</p>');
             return true
          } else {  
-            $('#log').append('<p>При запросе данных произошла ошибка: '+msg.error+'</p>');            
+            $('#log').append('<p>При запросе данных произошла ошибка: '+msg.message+'</p>');            
             return false;
         }				
       });           
@@ -35,13 +36,13 @@ function activateKey() {
         timeout: 3000
       });          
       request.done(function(msg) { // успешно	      
-        if (msg.status) {    
+        if (msg.error.status) {    
             $('#log').append('<p>Key: <span id="cryptoKey">'+msg.key+'</span></p>');
             $('#log').append('<p>Signature: <span id="cryptoSignature">'+msg.signature+'</span></p>');            
             $('#log').append('<p><button id="checkCrypto" type="button" class="btn btn-info btn-sm" onclick="checkCrypto()">Check Crypto</button></p>');
             return true
          } else {  
-            $('#log').append('<p>При запросе данных произошла ошибка: '+msg.error+'</p>');            
+            $('#log').append('<p>При запросе данных произошла ошибка: '+msg.error.message+'</p>');            
             return false;
         }				
       });           

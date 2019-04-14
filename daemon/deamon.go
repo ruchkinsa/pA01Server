@@ -10,6 +10,7 @@ import (
 	"path"
 	"syscall"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/ruchkinsa/pA01Server/api"
 	"github.com/ruchkinsa/pA01Server/database"
 )
@@ -45,15 +46,16 @@ func Run(cfg *Config) error {
 
 	api.Start(cfg.API, listener)
 
-	waitForSignal()
+	waitForSignal(dbConnect.DbConn)
 
 	return nil
 }
 
-func waitForSignal() {
+func waitForSignal(db *sqlx.DB) {
 	ch := make(chan os.Signal)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 	s := <-ch
+	db.Close()
 	log.Printf("Got signal: %v, exiting.", s)
 }
 

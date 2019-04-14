@@ -5,8 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
-	"database/sql"
-	"encoding/base64"
 
 	//"encoding/hex"
 	"encoding/json"
@@ -14,15 +12,13 @@ import (
 	"hash"
 	"html/template"
 	"io"
-	"io/ioutil"
+
 	"log"
-	"math/big"
 	"net"
 	"net/http"
 	"os"
 	"path"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/ruchkinsa/pA01Server/database"
@@ -30,8 +26,6 @@ import (
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/jwtauth"
-	"golang.org/x/text/encoding/charmap"
-	"golang.org/x/text/transform"
 )
 
 type Config struct {
@@ -91,6 +85,14 @@ type Product struct {
 	KeyPrivatePrecomputedCRTValueR     string `db:"keyPrivatePrecomputedCRTValueR"`
 }
 
+type recordLog struct {
+	id          int    `db:"id"`
+	eventDate   string `db:"eventDate"`
+	eventIDType int    `db:"eventIDType"`
+	eventResult string `db:"eventResult"`
+	note        string `db:"note"`
+}
+
 type Spr struct {
 	ID   int    `db:"id"`
 	Name string `db:"name"`
@@ -102,6 +104,11 @@ type Page struct {
 	Auth     bool
 	Keys     []Key
 	Products []Product
+}
+
+type errorJSON struct {
+	Status  bool   `json:"status"`
+	Message string `json:"message"`
 }
 
 type cryptoSettings struct {
@@ -133,7 +140,7 @@ type StandardClaims struct {
 var tokenAuth *jwtauth.JWTAuth
 var cryptoSetting cryptoSettings
 
-var u User
+var user User
 
 var templates = make(map[string]*template.Template)
 
@@ -163,8 +170,8 @@ func Start(cfg Config, listener net.Listener) {
 		return
 	}
 
-	u.create(cfg.DbConnect)
-	u.setFileKeys(path.Join(cfg.PublicPath, cfg.NameFile))
+	user.create(cfg.DbConnect)
+	user.setFileKeys(path.Join(cfg.PublicPath, cfg.NameFile))
 	//u.setDb(cfg.DbConnect)
 	r := chi.NewRouter()
 	// routers:
@@ -227,12 +234,12 @@ func Start(cfg Config, listener net.Listener) {
 
 func productsHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		products, err := u.getDbProductsAll()
+		products, err := user.getDbProductsAll()
 		if err != nil {
 			errorHandler(w, r, http.StatusBadRequest)
 			return
 		}
-		p := Page{Title: "products", Products: products, Auth: u.getAuth()}
+		p := Page{Title: "products", Products: products, Auth: user.getAuth()}
 		renderTemplate(w, r, "products", &p)
 	})
 }
@@ -241,29 +248,28 @@ func productSaveHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 
 	type resultJSON struct {
-		Status bool    `json:"status"`
-		Error  string  `json:"error"`
-		Data   Product `json:"data"`
+		Error errorJSON `json:"error"`
+		Data  Product   `json:"data"`
 	}
 	var result resultJSON
-	result.Status = true
+	result.Error.Status = true
 	id, err := strconv.Atoi(r.FormValue("id"))
 	if err != nil {
-		result.Status = false
-		result.Error = "id - " + err.Error()
+		result.Error.Status = false
+		result.Error.Message = "id - " + err.Error()
 	}
 	result.Data.ID = id
 	if result.Data.Name = r.FormValue("name"); result.Data.Name == "" {
-		result.Status = false
-		result.Error = "text - null"
+		result.Error.Status = false
+		result.Error.Message = "text - null"
 	}
 	if result.Data.Version = r.FormValue("version"); result.Data.Version == "" {
-		result.Status = false
-		result.Error = "expirationDate - null"
+		result.Error.Status = false
+		result.Error.Message = "expirationDate - null"
 	}
-	if err := u.productSave(&result.Data); err != nil {
-		result.Status = false
-		result.Error = "testerror"
+	if err := user.productSave(&result.Data); err != nil {
+		result.Error.Status = false
+		result.Error.Message = "testerror"
 	}
 	js, _ := json.Marshal(result)
 	fmt.Fprintf(w, string(js))
@@ -273,12 +279,12 @@ func keysHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		//keys, err := loadKeys(u.getFileKeys())
-		keys, err := u.getDbKeysAll()
+		keys, err := user.getDbKeysAll()
 		if err != nil {
 			errorHandler(w, r, http.StatusBadRequest)
 			return
 		}
-		p := Page{Title: "keys", Keys: keys, Auth: u.getAuth()}
+		p := Page{Title: "keys", Keys: keys, Auth: user.getAuth()}
 		renderTemplate(w, r, "keys", &p)
 	})
 }
@@ -287,37 +293,36 @@ func keySaveHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 
 	type resultJSON struct {
-		Status bool   `json:"status"`
-		Error  string `json:"error"`
-		Data   Key    `json:"data"`
+		Error errorJSON `json:"error"`
+		Data  Key       `json:"data"`
 	}
 	var result resultJSON
-	result.Status = true
+	result.Error.Status = true
 	id, err := strconv.Atoi(r.FormValue("id"))
 	if err != nil {
-		result.Status = false
-		result.Error = "Произошла ошибка: " + err.Error()
+		result.Error.Status = false
+		result.Error.Message = "Произошла ошибка: " + err.Error()
 	}
 	result.Data.ID = id
 	if result.Data.ExpirationDate = r.FormValue("expirationDate"); result.Data.ExpirationDate == "" {
-		result.Status = false
-		result.Error = "Произошла ошибка: expirationDate -> null"
+		result.Error.Status = false
+		result.Error.Message = "Произошла ошибка: expirationDate -> null"
 	}
 	if result.Data.IDStatus, err = strconv.Atoi(r.FormValue("status")); err != nil {
-		result.Status = false
-		result.Error = "Произошла ошибка: " + err.Error()
+		result.Error.Status = false
+		result.Error.Message = "Произошла ошибка: " + err.Error()
 	}
 	if result.Data.IDType, err = strconv.Atoi(r.FormValue("type")); err != nil {
-		result.Status = false
-		result.Error = "Произошла ошибка: " + err.Error()
+		result.Error.Status = false
+		result.Error.Message = "Произошла ошибка: " + err.Error()
 	}
 	if result.Data.IDProduct, err = strconv.Atoi(r.FormValue("product")); err != nil {
-		result.Status = false
-		result.Error = "Произошла ошибка: " + err.Error()
+		result.Error.Status = false
+		result.Error.Message = "Произошла ошибка: " + err.Error()
 	}
-	if err := u.keySave(&result.Data); err != nil {
-		result.Status = false
-		result.Error = "Произошла ошибка при сохранении данных"
+	if err := user.keySave(&result.Data); err != nil {
+		result.Error.Status = false
+		result.Error.Message = "Произошла ошибка при сохранении данных"
 	}
 	js, _ := json.Marshal(result)
 	fmt.Fprintf(w, string(js))
@@ -329,7 +334,7 @@ func keyDeleteHandler(w http.ResponseWriter, r *http.Request) {
 		errorHandler(w, r, http.StatusBadRequest)
 		return
 	}
-	if err = u.keyDelete(idKey); err != nil {
+	if err = user.keyDelete(idKey); err != nil {
 		errorHandler(w, r, http.StatusBadRequest)
 		return
 	}
@@ -340,16 +345,15 @@ func keyDeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 func getTableStatusHandler(w http.ResponseWriter, r *http.Request) {
 	type resultJSON struct {
-		Status bool   `json:"status"`
-		Error  string `json:"error"`
-		Data   []Spr  `json:"data"`
+		Error errorJSON `json:"error"`
+		Data  []Spr     `json:"data"`
 	}
 	var result resultJSON
-	result.Status = true
+	result.Error.Status = true
 	var err error
-	if result.Data, err = u.getTableStatus(); err != nil {
-		result.Status = false
-		result.Error = "Ошибка запроса таблицы статусов"
+	if result.Data, err = user.getTableStatus(); err != nil {
+		result.Error.Status = false
+		result.Error.Message = "Ошибка запроса таблицы статусов"
 	}
 	js, _ := json.Marshal(result)
 	fmt.Fprintf(w, string(js))
@@ -357,16 +361,15 @@ func getTableStatusHandler(w http.ResponseWriter, r *http.Request) {
 
 func getTableTypesHandler(w http.ResponseWriter, r *http.Request) {
 	type resultJSON struct {
-		Status bool   `json:"status"`
-		Error  string `json:"error"`
-		Data   []Spr  `json:"data"`
+		Error errorJSON `json:"error"`
+		Data  []Spr     `json:"data"`
 	}
 	var result resultJSON
-	result.Status = true
+	result.Error.Status = true
 	var err error
-	if result.Data, err = u.getTableTypes(); err != nil {
-		result.Status = false
-		result.Error = "Ошибка запроса таблицы статусов"
+	if result.Data, err = user.getTableTypes(); err != nil {
+		result.Error.Status = false
+		result.Error.Message = "Ошибка запроса таблицы статусов"
 	}
 	js, _ := json.Marshal(result)
 	fmt.Fprintf(w, string(js))
@@ -374,44 +377,44 @@ func getTableTypesHandler(w http.ResponseWriter, r *http.Request) {
 
 func getTableProductsHandler(w http.ResponseWriter, r *http.Request) {
 	type resultJSON struct {
-		Status bool   `json:"status"`
-		Error  string `json:"error"`
-		Data   []Spr  `json:"data"`
+		Error errorJSON `json:"error"`
+		Data  []Spr     `json:"data"`
 	}
 	var result resultJSON
-	result.Status = true
+	result.Error.Status = true
 	var err error
-	if result.Data, err = u.getTableProducts(); err != nil {
-		result.Status = false
-		result.Error = "Ошибка запроса таблицы продуктов"
+	if result.Data, err = user.getTableProducts(); err != nil {
+		result.Error.Status = false
+		result.Error.Message = "Ошибка запроса таблицы продуктов"
 	}
 	js, _ := json.Marshal(result)
 	fmt.Fprintf(w, string(js))
 }
 
 func testLicenseHandler(w http.ResponseWriter, r *http.Request) {
-	p := Page{Title: "Test", Auth: u.getAuth()}
+	p := Page{Title: "Test", Auth: user.getAuth()}
 	renderTemplate(w, r, "test", &p)
 }
 
 func licenseCheckHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
-	//log.Println("Form: ", r.Form)
-
-	type resultJSON struct {
-		Status bool   `json:"status"`
-		Error  string `json:"error"`
-	}
-	var result resultJSON
+	var result errorJSON
 	var keyID int
-	if keyID, result.Error = u.getIDKeyFindLic(r.FormValue("keyPublicN"), r.FormValue("keyPublicE")); result.Error != "" {
+	if keyID, result.Message = user.getIDKeyFindLic(r.FormValue("keyPublicN"), r.FormValue("keyPublicE")); result.Message != "" {
 		result.Status = false
 		// добавить запись в Logs
+		rec := recordLog{eventIDType: 1, eventResult: result.Message, note: "keyID=" + strconv.Itoa(keyID)}
+		if err := user.saveLogs(rec); err != nil {
+			log.Println("log: func licenseCheckHandler ->saveLogs -> error: ", err.Error())
+		}
 	} else {
-		result.Status, result.Error = u.checkLicenseKey(keyID, r.FormValue("keyText"))
+		result.Status, result.Message = user.checkLicenseKey(keyID, r.FormValue("keyText"))
 		// добавить запись в Logs
+		rec := recordLog{eventIDType: 1, eventResult: result.Message, note: "keyID=" + strconv.Itoa(keyID)}
+		if err := user.saveLogs(rec); err != nil {
+			log.Println("log: func licenseCheckHandler ->saveLogs -> error: ", err.Error())
+		}
 	}
-
 	js, _ := json.Marshal(result)
 	fmt.Fprintf(w, string(js))
 }
@@ -420,23 +423,34 @@ func licenseActivateHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 
 	type resultJSON struct {
-		Status    bool   `json:"status"`
-		Error     string `json:"error"`
-		Key       string `json:"key"`
-		Signature string `json:"signature"`
+		Error     errorJSON `json:"error"`
+		Key       string    `json:"key"`
+		Signature string    `json:"signature"`
 	}
 	var result resultJSON
 	var keyID int
-	if keyID, result.Error = u.getIDKeyFindLic(r.FormValue("keyPublicN"), r.FormValue("keyPublicE")); result.Error != "" {
-		result.Status = false
+	if keyID, result.Error.Message = user.getIDKeyFindLic(r.FormValue("keyPublicN"), r.FormValue("keyPublicE")); result.Error.Message != "" {
+		result.Error.Status = false
 		// добавить запись в Logs
+		rec := recordLog{eventIDType: 2, eventResult: result.Error.Message, note: "keyID=" + strconv.Itoa(keyID)}
+		if err := user.saveLogs(rec); err != nil {
+			log.Println("log: func licenseActivateHandler ->saveLogs -> error: ", err.Error())
+		}
 	} else {
-		if result.Key, result.Signature, result.Error = u.generateLicenseKey(keyID); result.Error != "" {
-			result.Status = false
+		if result.Key, result.Signature, result.Error.Message = user.generateLicenseKey(keyID); result.Error.Message != "" {
+			result.Error.Status = false
 			// добавить запись в Logs
+			rec := recordLog{eventIDType: 2, eventResult: result.Error.Message, note: "keyID=" + strconv.Itoa(keyID)}
+			if err := user.saveLogs(rec); err != nil {
+				log.Println("log: func licenseActivateHandler ->saveLogs -> error: ", err.Error())
+			}
 		} else {
-			result.Status = true
+			result.Error.Status = true
 			// добавить запись в Logs
+			rec := recordLog{eventIDType: 2, eventResult: "Лицензия сгенерирована", note: "keyID=" + strconv.Itoa(keyID)}
+			if err := user.saveLogs(rec); err != nil {
+				log.Println("log: func licenseActivateHandler ->saveLogs -> error: ", err.Error())
+			}
 		}
 	}
 
@@ -448,7 +462,7 @@ func licenseActivateHandler(w http.ResponseWriter, r *http.Request) {
 
 func indexHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		p := Page{Title: "Home", Body: template.HTML("<p>Home Page</p>"), Auth: u.getAuth()}
+		p := Page{Title: "Home", Body: template.HTML("<p>Home Page</p>"), Auth: user.getAuth()}
 		//log.Printf("%+v", p)
 		renderTemplate(w, r, "index", &p)
 	})
@@ -465,8 +479,8 @@ func authHandler() http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		login := r.PostFormValue("username")
 		password := r.PostFormValue("password")
-		if u.loginCheck(login, password) {
-			u.setAuth(true)
+		if user.loginCheck(login, password) {
+			user.setAuth(true)
 			// создание и запись данных о пользователе в сессию/БД/cookie
 			token, err := createTokenJWT(login)
 			if err != nil {
@@ -493,7 +507,7 @@ func authHandler() http.HandlerFunc {
 }
 
 func logoutHandler(w http.ResponseWriter, r *http.Request) {
-	u.setAuth(false)
+	user.setAuth(false)
 	jwtCookie := http.Cookie{Name: "jwt", Value: "", HttpOnly: false, Path: "/", MaxAge: -1, Expires: time.Unix(0, 0)}
 	http.SetCookie(w, &jwtCookie)
 	// redirect to URL
@@ -545,418 +559,4 @@ func errorHandler(w http.ResponseWriter, r *http.Request, status int) {
 		http.Error(w, http.StatusText(500), 500)
 	}
 	return
-}
-
-//********** User **********************************************************************************************************************************************
-
-func (u *User) create(db database.Config) {
-	u.Name = "N/A"
-	u.Auth = false
-	u.Db = db
-}
-
-func (u *User) setAuth(auth bool) {
-	u.Auth = auth
-}
-
-func (u *User) getAuth() bool {
-	return u.Auth
-}
-
-func (u *User) setFileKeys(fileKeys string) {
-	u.FileKeys = fileKeys
-}
-
-func (u *User) getFileKeys() string {
-	return u.FileKeys
-}
-
-func (u *User) setDb(db database.Config) {
-	u.Db = db
-}
-
-func (u *User) loginCheck(login, password string) bool {
-	db := u.Db.DbConn.DbConn
-	row := db.QueryRow("SELECT count(id) FROM users WHERE login = ? and password = ?", login, password)
-	var countRecord int
-	if err := row.Scan(&countRecord); err == sql.ErrNoRows || countRecord == 0 || err != nil {
-		log.Println("log func loginCheck -> error: ", err)
-		return false
-	}
-	return true
-}
-
-func (u *User) getDbKeysAll() ([]Key, error) {
-	db := u.Db.DbConn.DbConn
-	keys := make([]Key, 0)
-	if err := db.Select(&keys, "select l.id,l.keyText,l.keyPublicN,l.keyPublicE,p.name as product,s.name as status,t.name as typeLic,l.lastUsed,l.expirationDate from licenses l left join license_status s on l.idStatus=s.id left join products p on l.idProduct=p.id left join license_types t on l.idType=t.id"); err != nil {
-		log.Println("log: getDbKeysAll -> error: ", err.Error())
-		return nil, err
-	}
-	return keys, nil
-}
-
-func (u *User) keySave(key *Key) error {
-	db := u.Db.DbConn.DbConn
-	if key.ID == 0 {
-		t := time.Now().Format("2006-01-02 15:04:05")
-		// генерация keyPrivate для key
-		privateKey, err := rsa.GenerateKey(rand.Reader, cryptoSetting.bits)
-		if err != nil {
-			log.Println("log: func keySave -> error: ", err.Error())
-			return err
-		}
-		key.KeyPublicN = privateKey.PublicKey.N.String()
-		key.KeyPublicE = strconv.Itoa(privateKey.PublicKey.E)
-		key.KeyPrivateD = privateKey.D.String()
-		key.KeyPrivatePrimes = ""
-		for _, prime := range privateKey.Primes {
-			key.KeyPrivatePrimes += " " + prime.String()
-		}
-		key.KeyPrivatePrecomputedDp = privateKey.Precomputed.Dp.String()
-		key.KeyPrivatePrecomputedDq = privateKey.Precomputed.Dq.String()
-		key.KeyPrivatePrecomputedQinv = privateKey.Precomputed.Qinv.String()
-		key.KeyPrivatePrecomputedCRTValueExp = ""
-		key.KeyPrivatePrecomputedCRTValueCoeff = ""
-		key.KeyPrivatePrecomputedCRTValueR = ""
-		for _, crtv := range privateKey.Precomputed.CRTValues {
-			key.KeyPrivatePrecomputedCRTValueExp += " " + crtv.Exp.String()
-			key.KeyPrivatePrecomputedCRTValueCoeff += " " + crtv.Coeff.String()
-			key.KeyPrivatePrecomputedCRTValueR += " " + crtv.R.String()
-		}
-		key.KeyText = "N/A"
-		rec, err := db.Exec("INSERT INTO licenses (keyText,idProduct,idStatus,idtype,expirationDate,keyPublicN, keyPublicE, keyPrivateD, keyPrivatePrimes, keyPrivatePrecomputedDp, keyPrivatePrecomputedDq, keyPrivatePrecomputedQinv, keyPrivatePrecomputedCRTValueExp, keyPrivatePrecomputedCRTValueCoeff, keyPrivatePrecomputedCRTValueR) VALUES('" + key.KeyText + "'," + strconv.Itoa(key.IDProduct) + "," + strconv.Itoa(key.IDStatus) + "," + strconv.Itoa(key.IDType) + ",'" + t + "','" + key.KeyPublicN + "','" + key.KeyPublicE + "','" + key.KeyPrivateD + "','" + strings.TrimLeft(key.KeyPrivatePrimes, " ") + "','" + key.KeyPrivatePrecomputedDp + "','" + key.KeyPrivatePrecomputedDq + "','" + key.KeyPrivatePrecomputedQinv + "','" + strings.TrimLeft(key.KeyPrivatePrecomputedCRTValueExp, " ") + "','" + strings.TrimLeft(key.KeyPrivatePrecomputedCRTValueCoeff, " ") + "','" + strings.TrimLeft(key.KeyPrivatePrecomputedCRTValueR, " ") + "');")
-		if err != nil {
-			log.Println("log: func keySave -> error: ", err.Error())
-			return err
-		}
-		id, err := rec.LastInsertId()
-		if err != nil {
-			log.Println("log: func keySave -> error: ", err.Error())
-			return err
-		}
-		key.ID = int(id)
-	} else {
-		if _, err := db.Exec("UPDATE `licenses` SET idStatus=" + strconv.Itoa(key.IDStatus) + ",idType=" + strconv.Itoa(key.IDType) + ",expirationDate='" + key.ExpirationDate + "' WHERE id=" + strconv.Itoa(key.ID)); err != nil {
-			log.Println("log: func keySave -> error: ", err.Error())
-			return err
-		}
-	}
-	return nil
-}
-
-func (u *User) keyDelete(id int) error {
-	db := u.Db.DbConn.DbConn
-	if _, err := db.Exec("DELETE FROM licenses where id=?", id); err != nil {
-		log.Println("log: func keyDelete -> error: ", err.Error())
-		return err
-	}
-
-	return nil
-}
-func (u *User) getDbProductsAll() ([]Product, error) {
-	db := u.Db.DbConn.DbConn
-	products := make([]Product, 0)
-	if err := db.Select(&products, "SELECT id,name,keyPublicN,keyPublicE,version FROM products"); err != nil {
-		log.Println("log: func getDbProductsAll -> error: ", err.Error())
-		return nil, err
-	}
-	return products, nil
-}
-
-func (u *User) productSave(product *Product) error {
-	db := u.Db.DbConn.DbConn
-	if product.ID == 0 {
-		// генерация keyPrivate для product
-		privateKey, err := rsa.GenerateKey(rand.Reader, cryptoSetting.bits)
-		if err != nil {
-			log.Println("log: func productSave -> error: ", err.Error())
-			return err
-		}
-		product.KeyPublicN = privateKey.PublicKey.N.String()
-		product.KeyPublicE = strconv.Itoa(privateKey.PublicKey.E)
-		product.KeyPrivateD = privateKey.D.String()
-		product.KeyPrivatePrimes = ""
-		for _, prime := range privateKey.Primes {
-			product.KeyPrivatePrimes += " " + prime.String()
-		}
-		product.KeyPrivatePrecomputedDp = privateKey.Precomputed.Dp.String()
-		product.KeyPrivatePrecomputedDq = privateKey.Precomputed.Dq.String()
-		product.KeyPrivatePrecomputedQinv = privateKey.Precomputed.Qinv.String()
-		product.KeyPrivatePrecomputedCRTValueExp = ""
-		product.KeyPrivatePrecomputedCRTValueCoeff = ""
-		product.KeyPrivatePrecomputedCRTValueR = ""
-		for _, crtv := range privateKey.Precomputed.CRTValues {
-			product.KeyPrivatePrecomputedCRTValueExp += " " + crtv.Exp.String()
-			product.KeyPrivatePrecomputedCRTValueCoeff += " " + crtv.Coeff.String()
-			product.KeyPrivatePrecomputedCRTValueR += " " + crtv.R.String()
-		}
-		rec, err := db.Exec("INSERT INTO products (name,version,keyPublicN, keyPublicE, keyPrivateD, keyPrivatePrimes, keyPrivatePrecomputedDp, keyPrivatePrecomputedDq, keyPrivatePrecomputedQinv, keyPrivatePrecomputedCRTValueExp, keyPrivatePrecomputedCRTValueCoeff, keyPrivatePrecomputedCRTValueR) VALUES('" + product.Name + "','" + product.Version + "' ,'" + product.KeyPublicN + "','" + product.KeyPublicE + "','" + product.KeyPrivateD + "','" + strings.TrimLeft(product.KeyPrivatePrimes, " ") + "','" + product.KeyPrivatePrecomputedDp + "','" + product.KeyPrivatePrecomputedDq + "','" + product.KeyPrivatePrecomputedQinv + "','" + strings.TrimLeft(product.KeyPrivatePrecomputedCRTValueExp, " ") + "','" + strings.TrimLeft(product.KeyPrivatePrecomputedCRTValueCoeff, " ") + "','" + strings.TrimLeft(product.KeyPrivatePrecomputedCRTValueR, " ") + "');")
-		if err != nil {
-			log.Println("log: func productSave -> error: ", err.Error())
-			return err
-		}
-		id, err := rec.LastInsertId()
-		if err != nil {
-			log.Println("log: func productSave -> error: ", err.Error())
-			return err
-		}
-		product.ID = int(id)
-	} else {
-		if _, err := db.Exec("UPDATE products SET name='" + product.Name + "',version='" + product.Version + "' WHERE id=" + strconv.Itoa(product.ID)); err != nil {
-			log.Println("log: func productSave -> error: ", err.Error())
-			return err
-		}
-	}
-	return nil
-}
-
-func (u *User) getTableStatus() ([]Spr, error) {
-	db := u.Db.DbConn.DbConn
-	status := make([]Spr, 0)
-	if err := db.Select(&status, "SELECT id,name FROM license_status"); err != nil {
-		log.Println("log: func getTableStatus -> error: ", err.Error())
-		return nil, err
-	}
-	var data []Spr
-	for _, rec := range status {
-		data = append(data, Spr{rec.ID, rec.Name})
-	}
-	return data, nil
-}
-
-func win1251Toutf8(st string) (string, error) {
-	sr := strings.NewReader(st)
-	tr := transform.NewReader(sr, charmap.Windows1251.NewDecoder())
-	buf, err := ioutil.ReadAll(tr)
-	if err != err {
-		return "", err
-	}
-	return string(buf), err // строка в UTF-8
-}
-
-func (u *User) getTableTypes() ([]Spr, error) {
-	db := u.Db.DbConn.DbConn
-	tupes := make([]Spr, 0)
-	if err := db.Select(&tupes, "SELECT id,name FROM license_types"); err != nil {
-		log.Println("log: func getTableTypes -> error: ", err.Error())
-		return nil, err
-	}
-	var data []Spr
-	for _, rec := range tupes {
-		data = append(data, Spr{rec.ID, rec.Name})
-	}
-	return data, nil
-}
-
-func (u *User) getTableProducts() ([]Spr, error) {
-	db := u.Db.DbConn.DbConn
-
-	products := make([]Product, 0)
-	if err := db.Select(&products, "SELECT id,name FROM products"); err != nil {
-		log.Println("log: func getTableProducts -> error: ", err.Error())
-		return nil, err
-	}
-	var data []Spr
-	for _, rec := range products {
-		data = append(data, Spr{rec.ID, rec.Name})
-	}
-	return data, nil
-}
-
-func (u *User) getIDKeyFindLic(keyPublicN string, keyPublicE string) (int, string) {
-	db := u.Db.DbConn.DbConn
-
-	if (keyPublicN == "") || (keyPublicE == "") {
-		return 0, "Ошибка в данных запроса"
-	}
-	var key Key
-	if err := db.Get(&key, "SELECT id, idStatus, idType, expirationDate, TIMESTAMPDIFF(SECOND,NOW(),`expirationDate`) as idProduct FROM licenses WHERE keyPublicN = '"+keyPublicN+"' and keyPublicE = '"+keyPublicE+"'"); err != nil {
-		log.Println("log: func getIDKeyFindLic -> error: ", err.Error())
-		return 0, "Ошибка: лицензия не найдена."
-	}
-	if key.IDStatus == 0 {
-		return 0, "Ошибка: лицензия была блокирована, обратитесь в службу технической поддержки."
-	}
-	if (key.IDType == 2) && (key.IDProduct < 0) {
-		return 0, "Ошибка: истек срок действия лицензии."
-	}
-
-	return key.ID, ""
-}
-
-func (u *User) checkLicenseKey(keyID int, keyText string) (bool, string) {
-	db := u.Db.DbConn.DbConn
-	var key Key
-	if err := db.Get(&key, "SELECT keyText FROM licenses WHERE id = '"+strconv.Itoa(keyID)+"'"); err != nil {
-		log.Println("log: func checkLicenseKey -> error: ", err.Error())
-		return false, "Ошибка: лицензия не найдена."
-	}
-	if key.KeyText != keyText {
-		return false, "Ошибка: ключ лицензии не актуален. Активируйте лицензию повторно после переустановки или обратитесь в службу технической поддержки."
-	}
-
-	return true, ""
-}
-
-func base64ToInt(s string) (*big.Int, error) { // []byte -> big.Int
-	data, err := base64.StdEncoding.DecodeString(s)
-	if err != nil {
-		return nil, err
-	}
-	i := new(big.Int)
-	i.SetBytes(data)
-	return i, nil
-}
-func stringToBigInt(s string) (*big.Int, bool) {
-	return new(big.Int).SetString(strings.TrimSpace(s), 10)
-	/*	new(big.Int).SetString(string, base)
-		base - Базовый аргумент должен быть 0 или значением между 2 и MaxBase.
-		Если база равна 0, префикс строки определяет фактическую базу преобразования.
-		Префикс "0x" или "0X" выбирает базу 16; префикс "0" выбирает базу 8,
-		а префикс "0b" или "0B" выбирает базу 2.
-		В противном случае выбранная база равна 10.
-	*/
-}
-
-func stringToRSApublicKey(publicN string, publicE string) (rsa.PublicKey, bool) {
-	var keyPublic rsa.PublicKey
-	var ok bool
-	keyPublic.N, ok = stringToBigInt(publicN)
-	if !ok {
-		return keyPublic, false
-	}
-	keyPublic.E, _ = strconv.Atoi(publicE)
-	return keyPublic, true
-}
-
-func stringToRSAprivateKey(keyPublicN string, keyPublicE string, keyPrivateD string, keyPrivatePrimes string, keyPrivatePrecomputedDp string, keyPrivatePrecomputedDq string, keyPrivatePrecomputedQinv string, keyPrivatePrecomputedCRTValueExp string, keyPrivatePrecomputedCRTValueCoeff string, keyPrivatePrecomputedCRTValueR string) (*rsa.PrivateKey, bool) {
-	var keyPrivate rsa.PrivateKey
-	var keyPublic rsa.PublicKey
-	var ok bool
-	keyPublic, ok = stringToRSApublicKey(keyPublicN, keyPublicE)
-	if !ok {
-		log.Println("log: func stringToRSAprivateKey -> error: stringToRSApublicKey")
-		return nil, false
-	}
-	keyPrivate.PublicKey = keyPublic
-	keyPrivate.D, ok = stringToBigInt(keyPrivateD)
-	if !ok {
-		log.Println("log: func stringToRSAprivateKey -> error: stringToBigInt")
-		return nil, false
-	}
-	var primes []*big.Int
-	var pr *big.Int
-	for _, rec := range strings.Split(keyPrivatePrimes, " ") {
-		pr, ok = stringToBigInt(rec)
-		if !ok {
-			log.Println("log: func stringToRSAprivateKey -> error: primes")
-			return nil, false
-		}
-		primes = append(primes, pr)
-
-	}
-	keyPrivate.Primes = primes
-	keyPrivate.Precomputed.Dp, ok = stringToBigInt(keyPrivatePrecomputedDp)
-	if !ok {
-		log.Println("log: func stringToRSAprivateKey -> error: Precomputed.Dp")
-		return nil, false
-	}
-	keyPrivate.Precomputed.Dq, ok = stringToBigInt(keyPrivatePrecomputedDq)
-	if !ok {
-		log.Println("log: func stringToRSAprivateKey -> error: Precomputed.Dq")
-		return nil, false
-	}
-	keyPrivate.Precomputed.Qinv, ok = stringToBigInt(keyPrivatePrecomputedQinv)
-	if !ok {
-		log.Println("log: func stringToRSAprivateKey -> error: Precomputed.Qinv")
-		return nil, false
-	}
-	var mExp []*big.Int
-	if keyPrivatePrecomputedCRTValueExp != "" {
-		for _, rec := range strings.Split(keyPrivatePrecomputedCRTValueExp, " ") {
-			pr, ok = stringToBigInt(rec)
-			if !ok {
-				log.Println("log: func stringToRSAprivateKey -> error: keyPrivatePrecomputedCRTValueExp")
-				return nil, false
-			}
-			mExp = append(mExp, pr)
-		}
-	}
-	var mCoeff []*big.Int
-	if keyPrivatePrecomputedCRTValueCoeff != "" {
-		for _, rec := range strings.Split(keyPrivatePrecomputedCRTValueCoeff, " ") {
-			pr, ok = stringToBigInt(rec)
-			if !ok {
-				log.Println("log: func stringToRSAprivateKey -> error: keyPrivatePrecomputedCRTValueCoeff")
-				return nil, false
-			}
-			mCoeff = append(mCoeff, pr)
-		}
-	}
-
-	var mR []*big.Int
-	if keyPrivatePrecomputedCRTValueR != "" {
-		for _, rec := range strings.Split(keyPrivatePrecomputedCRTValueR, " ") {
-			pr, ok = stringToBigInt(rec)
-			if !ok {
-				log.Println("log: func stringToRSAprivateKey -> error: keyPrivatePrecomputedCRTValueR")
-				return nil, false
-			}
-			mR = append(mR, pr)
-		}
-	}
-	if (len(mExp) != len(mCoeff)) || (len(mR) != len(mCoeff)) || (len(mExp) != len(mR)) {
-		log.Println("log: func stringToRSAprivateKey -> error: if (len(mExp) != len(mCoeff)) || (len(mR) != len(mCoeff)) || (len(mExp) != len(mR))")
-		return nil, false
-	}
-	var crtValues []rsa.CRTValue
-	for i := 0; i < len(mExp); i++ {
-		crtValues = append(crtValues, rsa.CRTValue{mExp[i], mCoeff[i], mR[i]})
-	}
-	keyPrivate.Precomputed.CRTValues = crtValues
-
-	return &keyPrivate, true
-}
-
-func (u *User) generateLicenseKey(keyID int) (string, string, string) {
-	db := u.Db.DbConn.DbConn
-	var key Key
-	if err := db.Get(&key, "select l.keyPublicN,l.keyPublicE, l.idProduct from licenses l WHERE l.id = '"+strconv.Itoa(keyID)+"'"); err != nil {
-		log.Println("log: func generateLicenseKey -> error (db.Get(key)): ", err.Error())
-		return "", "", "Ошибка: лицензия не найдена."
-	}
-	secretText := []byte("уникальное вычисляемое значение")
-	var keyPublic rsa.PublicKey
-	var ok bool
-	keyPublic, ok = stringToRSApublicKey(key.KeyPublicN, key.KeyPublicE)
-	if !ok {
-		log.Println("log: func generateLicenseKey -> error: конвертации ключа keyPublic")
-		return "", "", "Ошибка конвертации ключа."
-	}
-	keyText, err := rsa.EncryptOAEP(cryptoSetting.hash, cryptoSetting.random, &keyPublic, secretText, cryptoSetting.label)
-	if err != nil {
-		log.Println("log: func generateLicenseKey -> error (EncryptOAEP): ", err.Error())
-		return "", "", "Ошибка: ключ лицензии не сформирован."
-	}
-
-	var product Product
-	if err := db.Get(&product, "select keyPublicN, keyPublicE, keyPrivateD, keyPrivatePrimes, keyPrivatePrecomputedDp, keyPrivatePrecomputedDq, keyPrivatePrecomputedQinv, keyPrivatePrecomputedCRTValueExp, keyPrivatePrecomputedCRTValueCoeff, keyPrivatePrecomputedCRTValueR from licenses l WHERE id = '"+strconv.Itoa(key.IDProduct)+"'"); err != nil {
-		log.Println("log: func generateLicenseKey -> error (db.QueryRow(product)): ", err.Error())
-		return "", "", "Ошибка: продукт не найден."
-	}
-	var keyPrivate *rsa.PrivateKey
-	keyPrivate, ok = stringToRSAprivateKey(product.KeyPublicN, product.KeyPublicE, product.KeyPrivateD, product.KeyPrivatePrimes, product.KeyPrivatePrecomputedDp, product.KeyPrivatePrecomputedDq, product.KeyPrivatePrecomputedQinv, product.KeyPrivatePrecomputedCRTValueExp, product.KeyPrivatePrecomputedCRTValueCoeff, product.KeyPrivatePrecomputedCRTValueR)
-	if !ok {
-		fmt.Println("log: func generateLicenseKey -> error: конвертации ключа ProductKeyPrivate")
-		return "", "", "Ошибка конвертации ключа."
-	}
-	cryptoSetting.pssh.Write(keyText)
-	signature, err := rsa.SignPSS(cryptoSetting.random, keyPrivate, cryptoSetting.signhash, cryptoSetting.pssh.Sum(nil), &cryptoSetting.opts)
-	if err != nil {
-		log.Println("log: func generateLicenseKey -> error (signature): ", err.Error())
-		return "", "", "Ошибка создания подписи."
-	}
-
-	return fmt.Sprintf("%x", keyText), fmt.Sprintf("%x", signature), ""
 }

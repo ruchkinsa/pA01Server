@@ -51,8 +51,8 @@ function keySave(){
         });
           
         request.done(function(msg) { // успешно	
-          //alert('status='+ msg.status);          
-          if (msg.status) {             
+          //alert('status='+ msg.error.status);          
+          if (msg.error.status) {             
               if (id == 0) {                  
                  $("#contentKeys").append('<tr id="record'+msg.data.ID+'">'
                                     + '<td class="ID">'+msg.data.ID+'</td>'
@@ -77,7 +77,7 @@ function keySave(){
               $('#modalRecord').modal('hide');
               return true;
            } else {                            
-              $("#message").empty().append('<div class="alert alert-danger otstup-vert10 text-center"><button type="button" class="close interval-right10" data-dismiss="alert" aria-hidden="true">&times;</button><strong>При сохранении произошла ошибка: '+msg.error+'</strong></div>');					
+              $("#message").empty().append('<div class="alert alert-danger otstup-vert10 text-center"><button type="button" class="close interval-right10" data-dismiss="alert" aria-hidden="true">&times;</button><strong>При сохранении произошла ошибка: '+msg.error.message+'</strong></div>');					
               return false;
           }				
         });
@@ -102,8 +102,8 @@ function keySave(){
           timeout: 3000
         });          
         request.done(function(msg) { // успешно	
-          //alert('status='+ msg.status);          
-          if (msg.status) {    
+          //alert('status='+ msg.error.status);          
+          if (msg.error.status) {    
             var content = '';
             $.each(msg.data, function(id, rec){
               //alert(id + ' => '+ name);
@@ -112,7 +112,7 @@ function keySave(){
             $("#mStatus").empty().append(content);
             return true
            } else {                           
-              $("#message").empty().append('<div class="alert alert-danger otstup-vert10 text-center"><button type="button" class="close interval-right10" data-dismiss="alert" aria-hidden="true">&times;</button><strong>При запросе данных произошла ошибка: '+msg.error+'</strong></div>');					
+              $("#message").empty().append('<div class="alert alert-danger otstup-vert10 text-center"><button type="button" class="close interval-right10" data-dismiss="alert" aria-hidden="true">&times;</button><strong>При запросе данных произошла ошибка: '+msg.error.message+'</strong></div>');					
               return false;
           }				
         });           
@@ -132,8 +132,8 @@ function keySave(){
       timeout: 3000
     });          
     request.done(function(msg) { // успешно	
-      //alert('status='+ msg.status);          
-      if (msg.status) {    
+      //alert('status='+ msg.error.status);          
+      if (msg.error.status) {    
         var content = '';
         $.each(msg.data, function(id, rec){
           //alert(id + ' => '+ name);
@@ -142,7 +142,7 @@ function keySave(){
         $("#mType").empty().append(content);
         return true
        } else {                           
-          $("#message").empty().append('<div class="alert alert-danger otstup-vert10 text-center"><button type="button" class="close interval-right10" data-dismiss="alert" aria-hidden="true">&times;</button><strong>При запросе данных произошла ошибка: '+msg.error+'</strong></div>');					
+          $("#message").empty().append('<div class="alert alert-danger otstup-vert10 text-center"><button type="button" class="close interval-right10" data-dismiss="alert" aria-hidden="true">&times;</button><strong>При запросе данных произошла ошибка: '+msg.error.message+'</strong></div>');					
           return false;
       }				
     });           
@@ -162,8 +162,8 @@ function keySave(){
       timeout: 3000
     });          
     request.done(function(msg) { // успешно	
-      //alert('status='+ msg.status);          
-      if (msg.status) {    
+      //alert('status='+ msg.error.status);          
+      if (msg.error.status) {    
         var content = '';
         //alert('data='+msg.data);        
         if ((msg.data) && (msg.data.length > 0)) {
@@ -172,13 +172,13 @@ function keySave(){
           return true;
         } else { 
             $("#mProduct").empty(); 
-            $("#message").empty().append('<div class="alert alert-danger otstup-vert10 text-center"><button type="button" class="close interval-right10" data-dismiss="alert" aria-hidden="true">&times;</button><strong>При запросе данных произошла ошибка: '+msg.error+'</strong></div>');					
+            $("#message").empty().append('<div class="alert alert-danger otstup-vert10 text-center"><button type="button" class="close interval-right10" data-dismiss="alert" aria-hidden="true">&times;</button><strong>При запросе данных произошла ошибка: '+msg.error.message+'</strong></div>');					
             return false;
         }        
         alert('!');        
        } else {
           $("#mProduct").empty();
-          $("#message").empty().append('<div class="alert alert-danger otstup-vert10 text-center"><button type="button" class="close interval-right10" data-dismiss="alert" aria-hidden="true">&times;</button><strong>При запросе данных произошла ошибка: '+msg.error+'</strong></div>');					
+          $("#message").empty().append('<div class="alert alert-danger otstup-vert10 text-center"><button type="button" class="close interval-right10" data-dismiss="alert" aria-hidden="true">&times;</button><strong>При запросе данных произошла ошибка: '+msg.error.message+'</strong></div>');					
           return false;
       }				
     });           
