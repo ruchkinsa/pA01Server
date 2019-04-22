@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
+
 	"log"
 	"math/big"
 	"strconv"
@@ -14,8 +14,6 @@ import (
 	"time"
 
 	"github.com/ruchkinsa/pA01Server/database"
-	"golang.org/x/text/encoding/charmap"
-	"golang.org/x/text/transform"
 )
 
 //********** User **********************************************************************************************************************************************
@@ -191,16 +189,6 @@ func (user *User) getTableStatus() ([]Spr, error) {
 		data = append(data, Spr{rec.ID, rec.Name})
 	}
 	return data, nil
-}
-
-func win1251Toutf8(st string) (string, error) {
-	sr := strings.NewReader(st)
-	tr := transform.NewReader(sr, charmap.Windows1251.NewDecoder())
-	buf, err := ioutil.ReadAll(tr)
-	if err != err {
-		return "", err
-	}
-	return string(buf), err // строка в UTF-8
 }
 
 func (user *User) getTableTypes() ([]Spr, error) {
